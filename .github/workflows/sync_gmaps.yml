@@ -1,0 +1,84 @@
+name: Google Maps Health Insurance Leads Sync
+
+on:
+  schedule:
+    - cron: "0 3 * * 0"   # Har Sunday raat 3 baje
+  workflow_dispatch:
+    inputs:
+      queries:
+        description: 'Comma-separated search queries'
+        default: 'health insurance office,insurance agent office,health insurance broker'
+      states:
+        description: 'Comma-separated states'
+        default: 'Maharashtra,Gujarat,Karnataka,Rajasthan,Delhi,Tamil Nadu'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Scrape Google Maps
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+        run: |
+          python3 - <<'PYEOF'
+          import os, sys
+          sys.path.insert(0, ".")
+
+          queries_input = os.environ.get("INPUT_QUERIES", "health insurance office,insurance agent office,health insurance broker")
+          states_input = os.environ.get("INPUT_STATES", "Maharashtra,Gujarat,Karnataka,Delhi,Tamil Nadu,Rajasthan")
+
+          queries = [q.strip() for q in queries_input.split(",")]
+          states = [s.strip() for s in states_input.split(",")]
+
+          from scrapers.gmaps_scraper import scrape_and_load
+
+          total = 0
+          for state in states:
+            for query in queries:
+              print(f"\n--- {query} | {state} ---")
+              try:
+                count = scrape_and_load(query=query, state=state)
+                total += count
+              except Exception as e:
+                print(f"Error: {e}")
+
+          print(f"\nTotal loaded this run: {total}")
+          PYEOF
+        env:
+          INPUT_QUERIES: ${{ github.event.inputs.queries || 'health insurance office,insurance agent office,health insurance broker' }}
+          INPUT_STATES: ${{ github.event.inputs.states || 'Maharashtra,Gujarat,Karnataka,Rajasthan,Delhi,Tamil Nadu' }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+
+      - name: Report
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python3 - <<'PYEOF'
+          import sys
+          sys.path.insert(0, ".")
+          from app.database import SessionLocal
+          from app.models import Lead, SourceType
+          db = SessionLocal()
+          total = db.query(Lead).count()
+          gmaps = db.query(Lead).filter(Lead.source == SourceType.GOOGLE_MAPS).count()
+          with_phone = db.query(Lead).filter(Lead.phone_primary.isnot(None)).count()
+          print(f"Total leads: {total:,}")
+          print(f"Google Maps leads: {gmaps:,}")
+          print(f"Leads with phone: {with_phone:,}")
+          db.close()
+          PYEOF
