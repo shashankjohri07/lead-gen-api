@@ -30,6 +30,12 @@ class LeadOut(BaseModel):
     voter_id: Optional[str]
     constituency: Optional[str]
 
+    # Lead-capture fields
+    interest: Optional[str] = None
+    consent: Optional[bool] = None
+    utm_source: Optional[str] = None
+    contacted: Optional[bool] = None
+
     phone_verified: bool
     email_verified: bool
     created_at: Optional[datetime]
