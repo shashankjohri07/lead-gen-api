@@ -8,6 +8,7 @@ class SourceType(str, enum.Enum):
     MCA_DIRECTOR = "mca_director"
     VOTER_ROLL = "voter_roll"
     GOOGLE_MAPS = "google_maps"
+    LANDING_PAGE = "landing_page"
     MANUAL = "manual"
 
 
@@ -55,6 +56,12 @@ class Lead(Base):
     voter_id = Column(String(30), nullable=True)
     constituency = Column(String(200), nullable=True)
     booth_no = Column(String(20), nullable=True)
+
+    # Lead-capture (landing page) fields
+    consent = Column(Boolean, default=False)        # user ne contact hone ki permission di
+    interest = Column(String(200), nullable=True)   # kaunsa insurance chahiye
+    utm_source = Column(String(100), nullable=True)  # kaunse ad/campaign se aaya
+    contacted = Column(Boolean, default=False)       # agent ne contact kiya ya nahi
 
     # Enrichment flags
     phone_verified = Column(Boolean, default=False)
